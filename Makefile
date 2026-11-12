@@ -2,6 +2,7 @@
 SHELL:=/bin/bash
 
 ##@ Linting and static checks
+
 .PHONY: vet
 
 vet:  ## Run go vet
@@ -17,6 +18,16 @@ test: vet  ## Run tests
 test-cov-html: vet  ## Run test coverage
 	@go test ./... -covermode=count -coverprofile=coverage.out \
 	&& go tool cover -html=coverage.out
+
+##@ Build
+
+.PHONY: docker lint-docker
+
+lint-docker:
+	@hadolint Dockerfile
+
+bake: lint-docker
+	@docker buildx bake image-local
 
 ##@ Helpers
 

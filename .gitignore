@@ -12,11 +12,17 @@
 
 !/.editorconfig
 
+!/Dockerfile
+!/docker-bake.hcl
+!/.dockerignore
+
 !*.go
 !go.sum
 !go.mod
 
 !*.tmpl
+!*.yaml
+!*.yml
 
 !README.md
 !LICENSE
