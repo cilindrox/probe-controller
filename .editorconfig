@@ -1,0 +1,13 @@
+# EditorConfig is awesome: http://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*.go]
+indent_style = tabs
+indent_size = 4
+
+[Makefile]
+indent_style = tabs
+indent_size = 4
