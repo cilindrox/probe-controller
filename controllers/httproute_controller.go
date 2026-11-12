@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,6 +23,9 @@ const (
 
 type HTTPRouteWatcher struct {
 	client.Client
+	ExternalAPIURL string
+	APIToken       string
+	HTTPClient     *http.Client
 }
 
 type WebhookPayload struct {
@@ -114,13 +118,28 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-func callExternalAPI(payload WebhookPayload) error {
+func (r *HTTPRouteWatcher) callExternalAPI(ctx context.Context, payload WebhookPayload) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post("https://example.com", "application/json", bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.ExternalAPIURL, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	if r.APIToken != "" {
+		req.Header.Set("Authorization", "Bearer "+r.APIToken)
+	}
+
+	httpClient := r.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 10 * time.Second}
+	}
+
+	resp, err := http.Do(req)
 	if err != nil {
 		return err
 	}
