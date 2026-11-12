@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/cilindrox/probe-controller/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,14 +29,18 @@ func init() {
 }
 
 func main() {
+	var apiURL string
 	var metricsAddr string
 	var probeAddr string
 	var enableLeaderElection bool
 
+	flag.StringVar(&apiURL, "api-url", "", "External API URL.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The adress the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager.")
 	flag.Parse()
+
+	apiToken := os.GetEnv("EXTERNAL_API_TOKEN")
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
@@ -52,7 +58,10 @@ func main() {
 
 	// Register the HTTPRouteWatcher reconciler
 	if err = (&controllers.HTTPRouteWatcher{
-		Client: mgr.GetClient(),
+		Client:         mgr.GetClient(),
+		ExternalAPIURL: apiURL,
+		APIToken:       apiToken,
+		HTTPClient:     &http.Client{Timeout: 10 * time.Second},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HTTPRoute")
 		os.Exit(1)
