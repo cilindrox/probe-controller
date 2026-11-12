@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,7 +53,7 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 			},
 		},
 		Spec: gatewayv1.HTTPRouteSpec{
-			Hostnames: []gatewayv1.Hostname{"://example.com"},
+			Hostnames: []gatewayv1.Hostname{"app.example.com"},
 		},
 	}
 
@@ -84,7 +83,7 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	}
 
 	if len(receivedEvents) != 1 || receivedEvents[0].Event != "CREATED" {
-		t.Fatalf("expected 1 created event, got: %+v", receivedEvents)
+		t.Fatalf("expected 1 CREATED event, got: %+v", receivedEvents)
 	}
 
 	// --- TEST: SKIP NOOP ---
@@ -100,7 +99,7 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	var updatedRoute gatewayv1.HTTPRoute
 	_ = fakeClient.Get(ctx, req.NamespacedName, &updatedRoute)
 	updatedRoute.Generation = 2 // API server increments generation
-	updatedRoute.Spec.Hostnames = []gatewayv1.Hostname{"://example.com"}
+	updatedRoute.Spec.Hostnames = []gatewayv1.Hostname{"www.example.com"}
 	_ = fakeClient.Update(ctx, &updatedRoute)
 
 	if _, err := reconciler.Reconcile(ctx, req); err != nil {
@@ -112,16 +111,16 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	}
 
 	// --- TEST: DELETE ---
-	now := metav1.NewTime(time.Now())
 	_ = fakeClient.Get(ctx, req.NamespacedName, &updatedRoute)
-	updatedRoute.DeletionTimestamp = &now
-	_ = fakeClient.Update(ctx, &updatedRoute)
+	if err := fakeClient.Delete(ctx, &updatedRoute); err != nil {
+		t.Fatalf("failed to delete route: %v", err)
+	}
 
-	if err := reconciler.Reconcile(ctx, req); err != nil {
+	if _, err := reconciler.Reconcile(ctx, req); err != nil {
 		t.Fatalf("delete reconcile failed: %v", err)
 	}
 
 	if len(receivedEvents) != 3 || receivedEvents[2].Event != "DELETED" {
-		t.Fatalf("expected DELETED event, got %+v", receivedEvents)
+		t.Fatalf("expected DELETED event, got: %+v", receivedEvents)
 	}
 }

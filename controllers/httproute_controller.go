@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	triggerAnnotation    = ""
-	lastSyncedAnnotation = ""
-	finalizerName        = ""
+	triggerAnnotation    = "com.example/trigger"
+	lastSyncedAnnotation = "com.example/syncedAt"
+	finalizerName        = "com.example/finalizer"
 )
 
 type HTTPRouteWatcher struct {
@@ -42,15 +42,15 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Delete
-	if !route.ObjectMeta.DeletionTimestamp.IsZero() {
+	if !route.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(&route, finalizerName) {
 			payload := WebhookPayload{
 				Event:     "DELETED",
 				Name:      route.Name,
 				Namespace: route.Namespace,
 			}
-			if err := callExternalAPI(payload); err != nil {
-				// backoff retry with until external cleanup succeeds
+			if err := r.callExternalAPI(ctx, payload); err != nil {
+				// TODO(gfestari): backoff retry with until external cleanup succeeds
 				return ctrl.Result{}, err
 			}
 
@@ -102,7 +102,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Hostnames: route.Spec.Hostnames,
 	}
 
-	if err := callExternalAPI(payload); err != nil {
+	if err := r.callExternalAPI(ctx, payload); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -139,11 +139,13 @@ func (r *HTTPRouteWatcher) callExternalAPI(ctx context.Context, payload WebhookP
 		httpClient = &http.Client{Timeout: 10 * time.Second}
 	}
 
-	resp, err := http.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("external api failed with http %d", resp.StatusCode)
