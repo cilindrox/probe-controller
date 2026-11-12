@@ -40,7 +40,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager.")
 	flag.Parse()
 
-	apiToken := os.GetEnv("EXTERNAL_API_TOKEN")
+	apiToken := os.Getenv("EXTERNAL_API_TOKEN")
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
