@@ -42,6 +42,8 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	base := route.DeepCopy()
+
 	// Delete
 	if !route.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(&route, finalizerName) {
@@ -57,7 +59,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 			// Remove finalizer so k8s can complete deletion
 			controllerutil.RemoveFinalizer(&route, finalizerName)
-			if err := r.Update(ctx, &route); err != nil {
+			if err := r.Patch(ctx, &route, client.MergeFrom(base)); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -68,7 +70,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if route.Annotations[triggerAnnotation] != "true" {
 		if controllerutil.ContainsFinalizer(&route, finalizerName) {
 			controllerutil.RemoveFinalizer(&route, finalizerName)
-			return ctrl.Result{}, r.Update(ctx, &route)
+			return ctrl.Result{}, r.Patch(ctx, &route, client.MergeFrom(base))
 		}
 		return ctrl.Result{}, nil
 	}
@@ -76,7 +78,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Ensure finalizer is registered before syncing
 	if !controllerutil.ContainsFinalizer(&route, finalizerName) {
 		controllerutil.AddFinalizer(&route, finalizerName)
-		if err := r.Update(ctx, &route); err != nil {
+		if err := r.Patch(ctx, &route, client.MergeFrom(base)); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
@@ -114,7 +116,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		route.Annotations = make(map[string]string)
 	}
 	route.Annotations[checksumAnnotation] = currentHash
-	if err := r.Update(ctx, &route); err != nil {
+	if err := r.Patch(ctx, &route, client.MergeFrom(base)); err != nil {
 		return ctrl.Result{}, err
 	}
 
