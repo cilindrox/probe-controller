@@ -12,6 +12,10 @@ on:
         required: true
         default: dev
 
+concurrency:
+  group: ${{ github.workflow }}@${{ github.event.pull_request.head.label || github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -21,10 +25,11 @@ env:
 
 jobs:
   build-and-push:
+    name: Build and Push to Container Registry
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      packages: write  # required for publishing artifacts
 
     steps:
     - name: Checkout code
@@ -46,11 +51,14 @@ jobs:
 
     - name: Compute image tag
       id: meta
+      env:
+        GITHUB_EVENT_NAME: ${{ github.event.name }}
+        GITHUB_EVENT_INPUTS_TAG: ${{ github.event.inputs.tag }}
       run: |
-        if ["${{ github.event.name }}" = "workflow_dispatch"]; then
-          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+        if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+          echo "TAG=${GITHUB_EVENT_INPUTS_TAG}" >> "$GITHUB_OUTPUT"
         else
-          echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Build and push with Bake
@@ -61,4 +69,4 @@ jobs:
       env:
         REGISTRY: ${{ env.REGISTRY }}
         IMAGE_NAME: ${{ env.IMAGE_NAME }}
-        TAG: ${{ steps.meta.outputsk.TAG }}
+        TAG: ${{ steps.meta.outputs.TAG }}
