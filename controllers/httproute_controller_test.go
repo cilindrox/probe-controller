@@ -187,6 +187,9 @@ func TestHTTPRouteWatcher_AnnotationRemoved_CleansUpFinalizer(t *testing.T) {
 		Name:       "untracked-route",
 		Namespace:  "default",
 		Finalizers: []string{finalizerName},
+		Annotations: map[string]string{
+			checksumAnnotation: "some-previous-hash",
+		},
 	}
 
 	env := newTestEnv(t, route)
@@ -200,6 +203,11 @@ func TestHTTPRouteWatcher_AnnotationRemoved_CleansUpFinalizer(t *testing.T) {
 		t.Fatalf("reconcile failed: %v", err)
 	}
 
+	events := env.recordedEvents()
+	if len(events) != 1 || events[0].Event != eventDeleted {
+		t.Fatalf("expected 1 DELETED event on unregister, got: %+v", events)
+	}
+
 	var updated gatewayv1.HTTPRoute
 	if err := env.client.Get(ctx, req.NamespacedName, &updated); err != nil {
 		t.Fatalf("failed to fetch updated route: %v", err)
@@ -207,8 +215,8 @@ func TestHTTPRouteWatcher_AnnotationRemoved_CleansUpFinalizer(t *testing.T) {
 	if controllerutil.ContainsFinalizer(&updated, finalizerName) {
 		t.Fatalf("expected finalizer %q to be removed, still present: %v", finalizerName, updated.Finalizers)
 	}
-	if len(env.recordedEvents()) != 0 {
-		t.Fatalf("expected 0 API calls when annotation is missing, got: %+v", env.recordedEvents())
+	if _, exists := updated.Annotations[checksumAnnotation]; exists {
+		t.Fatalf("expected %q annotation to be removed", checksumAnnotation)
 	}
 
 	// --- TEST: noop when neither annotation nor finalizer are present ---
@@ -256,6 +264,18 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 				Annotations: map[string]string{triggerAnnotation: "true"},
 			},
 			deleteBeforeSync:  true,
+			apiStatusCode:     http.StatusInternalServerError,
+			wantErr:           true,
+			wantFinalizerKept: true,
+		},
+		{
+			name: "API 500 on unregister returns error and keeps finalizer",
+			route: &gatewayv1.HTTPRoute{
+				Name:        "fail-unregister",
+				Namespace:   "default",
+				Finalizers:  []string{finalizerName},
+				Annotations: map[string]string{checksumAnnotation: "existing-checksum"},
+			},
 			apiStatusCode:     http.StatusInternalServerError,
 			wantErr:           true,
 			wantFinalizerKept: true,
@@ -381,8 +401,11 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 				if !controllerutil.ContainsFinalizer(&current, finalizerName) {
 					t.Fatalf("expected finalizer %q to remain, got: %v", finalizerName, current.Finalizers)
 				}
-				if tc.wantErr && current.Annotations[checksumAnnotation] != "" {
-					t.Fatalf("expected checksumAnnotation not to be stamped on failed API call, got %q", current.Annotations[checksumAnnotation])
+				if tc.wantErr && tc.route.Annotations[checksumAnnotation] == "" && current.Annotations[checksumAnnotation] != "" {
+					t.Fatalf("expected %q not to be stamped on failed API call, got %q", checksumAnnotation, current.Annotations[checksumAnnotation])
+				}
+				if tc.wantErr && tc.route.Annotations[checksumAnnotation] != "" && current.Annotations[checksumAnnotation] != tc.route.Annotations[checksumAnnotation] {
+					t.Fatalf("expected %q to be preserved on failed unregister, got %q", checksumAnnotation, current.Annotations[checksumAnnotation])
 				}
 			}
 		})
