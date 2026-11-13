@@ -129,10 +129,19 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	}
 
 	// --- TEST: SKIP NOOP ---
-	events = env.recordedEvents()
+	var statusRoute gatewayv1.HTTPRoute
+	_ = env.client.Get(ctx, req.NamespacedName, &statusRoute)
+	statusRoute.Status.Parents = []gatewayv1.RouteParentStatus{
+		{
+			ParentRef: gatewayv1.ParentReference{Name: "my-gateway"},
+		},
+	}
+	_ = env.client.Status().Update(ctx, &statusRoute)
+
 	if _, err := env.reconciler.Reconcile(ctx, req); err != nil {
 		t.Fatalf("status reconcile failed: %v", err)
 	}
+	events = env.recordedEvents()
 	if len(events) != 1 {
 		t.Fatalf("expected no duplicate call on same generation, got %d events", len(events))
 	}
