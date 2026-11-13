@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	triggerAnnotation    = "com.example/trigger"
-	lastSyncedAnnotation = "com.example/syncedAt"
-	finalizerName        = "com.example/finalizer"
+	triggerAnnotation  = "probe-controller.local/register"
+	checksumAnnotation = "probe-controller.local/checksum"
+	finalizerName      = "probe-controller.local/finalizer"
 )
 
 type HTTPRouteWatcher struct {
@@ -88,7 +88,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	lastSyncedHash := route.Annotations[lastSyncedAnnotation]
+	lastSyncedHash := route.Annotations[checksumAnnotation]
 	if currentHash == lastSyncedHash {
 		return ctrl.Result{}, nil
 	}
@@ -113,7 +113,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if route.Annotations == nil {
 		route.Annotations = make(map[string]string)
 	}
-	route.Annotations[lastSyncedAnnotation] = currentHash
+	route.Annotations[checksumAnnotation] = currentHash
 	if err := r.Update(ctx, &route); err != nil {
 		return ctrl.Result{}, err
 	}
