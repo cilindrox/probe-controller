@@ -126,12 +126,3 @@ spec:
           readOnlyRootFilesystem: true
           capabilities:
             drop: ['ALL']
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: prober-config
-  namespace: prober-system
-type: Opaque
-stringData:
-  EXTERNAL_API_TOKEN: 'my-secret-token'

@@ -51,6 +51,16 @@ func main() {
 	}
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	if apiURL == "" {
+		apiURL = os.Getenv("EXTERNAL_API_URL")
+	}
+	if apiURL == "" {
+		setupLog.Error(nil, "missing required --api-url flag or EXTERNAL_API_URL environment variable")
+		flag.Usage()
+		os.Exit(2)
+	}
+
 	setupLog.Info("initializing the controller", "version", version)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -66,6 +76,7 @@ func main() {
 	}
 
 	apiToken := os.Getenv("EXTERNAL_API_TOKEN")
+
 	// Register the HTTPRouteWatcher reconciler
 	if err = (&controllers.HTTPRouteWatcher{
 		Client:         mgr.GetClient(),
