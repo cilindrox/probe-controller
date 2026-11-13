@@ -429,7 +429,7 @@ func TestRouteEventFilter(t *testing.T) {
 	if !pred.Create(event.CreateEvent{Object: tracked}) {
 		t.Error("expected tracked CreateEvent to pass")
 	}
-	if pred.Delete(event.DeleteEvent{Object: tracked}) {
+	if !pred.Delete(event.DeleteEvent{Object: tracked}) {
 		t.Error("expected DeleteEvent to be skipped")
 	}
 	if !pred.Generic(event.GenericEvent{Object: tracked}) {

@@ -113,7 +113,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// Record synced generation to avoid re-triggering on status updates
+	// Record checksum to avoid re-triggering on status updates
 	if route.Annotations == nil {
 		route.Annotations = make(map[string]string)
 	}
@@ -221,7 +221,7 @@ func routeEventFilter() predicate.Predicate {
 			// finalizer deletion is handled via UpdateEvent when
 			// DeletionTimestamp is set.
 			// This is a placeholder in case fallback cleanup is needed.
-			return false
+			return true
 		},
 		GenericFunc: func(e event.GenericEvent) bool {
 			return isTracked(e.Object)
