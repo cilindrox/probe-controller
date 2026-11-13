@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -15,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -381,5 +383,112 @@ func TestHTTPRouteWatcher_SetupWithManager(t *testing.T) {
 	}
 	if err := reconciler.SetupWithManager(mgr); err != nil {
 		t.Fatalf("SetupWithManager() unexpected error = %v", err)
+	}
+}
+
+func TestRouteEventFilter(t *testing.T) {
+	pred := routeEventFilter()
+	now := metav1.Now()
+
+	untracked := &gatewayv1.HTTPRoute{
+		Name:       "untracked",
+		Generation: 1,
+	}
+	untrackedUpdated := untracked.DeepCopy()
+	untrackedUpdated.Generation = 2
+
+	tracked := &gatewayv1.HTTPRoute{
+		Name:        "tracked",
+		Generation:  1,
+		Annotations: map[string]string{triggerAnnotation: "true"},
+	}
+
+	trackedStatusOnly := tracked.DeepCopy()
+	trackedStatusOnly.Status.Parents = []gatewayv1.RouteParentStatus{
+		{ParentRef: gatewayv1.ParentReference{Name: "gw"}},
+	}
+
+	trackedDeleting := tracked.DeepCopy()
+	trackedDeleting.DeletionTimestamp = &now
+
+	trackedGenBumped := tracked.DeepCopy()
+	trackedGenBumped.Generation = 2
+
+	trackedAnnotationRemoved := tracked.DeepCopy()
+	delete(trackedAnnotationRemoved.Annotations, triggerAnnotation)
+
+	trackedWithFinalizer := tracked.DeepCopy()
+	trackedWithFinalizer.Finalizers = []string{finalizerName}
+
+	if pred.Create(event.CreateEvent{Object: nil}) {
+		t.Error("expected nil CreateEvent to be filtered out")
+	}
+	if pred.Create(event.CreateEvent{Object: untracked}) {
+		t.Error("expected untracked CreateEvent to be filtered out")
+	}
+	if !pred.Create(event.CreateEvent{Object: tracked}) {
+		t.Error("expected tracked CreateEvent to pass")
+	}
+	if pred.Delete(event.DeleteEvent{Object: tracked}) {
+		t.Error("expected DeleteEvent to be skipped")
+	}
+	if !pred.Generic(event.GenericEvent{Object: tracked}) {
+		t.Error("expected tracked GenericEvent to pass")
+	}
+
+	updateTests := []struct {
+		name   string
+		oldObj *gatewayv1.HTTPRoute
+		newObj *gatewayv1.HTTPRoute
+		want   bool
+	}{
+		{
+			name:   "ignores untracked route changes",
+			oldObj: untracked,
+			newObj: untrackedUpdated,
+			want:   false,
+		},
+		{
+			name:   "ignores status-only update on tracked route",
+			oldObj: tracked,
+			newObj: trackedStatusOnly,
+			want:   false,
+		},
+		{
+			name:   "passes when deletion timestamp is set",
+			oldObj: tracked,
+			newObj: trackedDeleting,
+			want:   true,
+		},
+		{
+			name:   "passes when generation increments",
+			oldObj: tracked,
+			newObj: trackedGenBumped,
+			want:   true,
+		},
+		{
+			name:   "passes when trigger annotation is removed",
+			oldObj: tracked,
+			newObj: trackedAnnotationRemoved,
+			want:   true,
+		},
+		{
+			name:   "passes when finalizer is added",
+			oldObj: tracked,
+			newObj: trackedWithFinalizer,
+			want:   true,
+		},
+	}
+
+	for _, tc := range updateTests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := pred.Update(event.UpdateEvent{
+				ObjectOld: tc.oldObj,
+				ObjectNew: tc.newObj,
+			})
+			if got != tc.want {
+				t.Errorf("Update() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
