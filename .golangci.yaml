@@ -1,0 +1,75 @@
+version: '2'
+linters:
+  default: none
+  enable:
+  - asasalint
+  - asciicheck
+  - bidichk
+  - bodyclose
+  - canonicalheader
+  - contextcheck
+  - copyloopvar
+  - decorder
+  - dogsled
+  - dupword
+  - durationcheck
+  - errcheck
+  - errchkjson
+  - errname
+  - exhaustive
+  - exptostd
+  - forbidigo
+  - ginkgolinter
+  - gocheckcompilerdirectives
+  - gochecksumtype
+  - gocritic
+  - goheader
+  - goprintffuncname
+  - gosec
+  - gosmopolitan
+  - govet
+  - grouper
+  - importas
+  - ineffassign
+  - interfacebloat
+  - intrange
+  - loggercheck
+  - makezero
+  - mirror
+  - misspell
+  - modernize
+  - musttag
+  - nakedret
+  - nilerr
+  - nilnil
+  - noctx
+  - nolintlint
+  - nosprintfhostport
+  - predeclared
+  - promlinter
+  - protogetter
+  - reassign
+  - sloglint
+  - staticcheck
+  - tagalign
+  - testableexamples
+  - unconvert
+  - unparam
+  - unused
+  - usestdlibvars
+  - usetesting
+  - wastedassign
+formatters:
+  enable: [gci, gofmt]
+  settings:
+    gci:
+      sections:
+      - standard  # Standard section: captures all standard packages.
+      - default  # Default section: contains all imports that could not be matched to another section type.
+      - localmodule  # Local module section: contains all local packages.
+      - blank  # Blank section: contains all blank imports. This section is not present unless explicitly enabled.
+      - dot  # Dot section: contains all dot imports. This section is not present unless explicitly enabled.
+      custom-order: true
+  exclusions:
+    generated: lax
+    paths: [third_party, builtin$, examples$]
