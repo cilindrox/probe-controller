@@ -335,8 +335,8 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 					t.Fatalf("finalizer present = %v, want %v", hasFinalizer, tc.wantFinalizerKept)
 				}
 
-				if tc.wantErr && current.Annotations[lastSyncedAnnotation] != "" {
-					t.Fatalf("expected lastSyncedAnnotation not to be stamped on failed API call, got %q", current.Annotations[lastSyncedAnnotation])
+				if tc.wantErr && current.Annotations[checksumAnnotation] != "" {
+					t.Fatalf("expected checksumAnnotation not to be stamped on failed API call, got %q", current.Annotations[checksumAnnotation])
 				}
 			}
 		})
