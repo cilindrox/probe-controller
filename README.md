@@ -19,10 +19,25 @@ The following environment variables are supported:
 
 | Variable             | Required | Description                                                               |
 | ---                  | ---      | ---                                                                       |
-| `EXTERNAL_API_URL`   | **Yes**  | Target HTTP/HTTPS endpoint that receives `POST` JSON payloads.            |
+| `EXTERNAL_API_URL`   | No*      | Target HTTP/HTTPS endpoint that receives `POST` JSON payloads.            |
 | `EXTERNAL_API_TOKEN` | No       | Optional Bearer token sent in the `Authorization: Bearer <token>` header. |
 
-These should be mounted from a Secret source on the namespace.
+> **NOTE**: one of `--api-url` flag or `EXTERNAL_API_URL` environment variable
+> are required.
+
+These should be mounted from a Secret source on the namespace, e.g.:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: prober-config
+  namespace: prober-system
+type: Opaque
+stringData:
+  EXTERNAL_API_TOKEN: 'my-secret-token'
+    EXTERNAL_API_URL: 'https://webhooks.example.com'
+```
 
 ### CLI Flags
 
@@ -30,6 +45,7 @@ The following CLI flags can be passed to the binary:
 
 | Flag                          | Default | Description                                                             |
 | ---                           | ---     | ---                                                                     |
+| `--api-url`                   | `""`    | External endpoint URL to deliver payloads to.                           |
 | `--leader-elect`              | `false` | Enable leader election for high-availability multi-replica deployments. |
 | `--metrics-bind-address`      | `:8080` | Address the Prometheus metrics endpoint binds to.                       |
 | `--health-probe-bind-address` | `:8081` | Address the `/healthz` and `/readyz` endpoints bind to.                 |
