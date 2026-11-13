@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   zizmor:
-    name: Run zizmor
+    name: Lint GitHub Actions
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
@@ -42,3 +42,6 @@ jobs:
         inputs: ./.github/
         online-audits: false  # https://github.com/zizmorcore/zizmor/issues/1350
         persona: pedantic
+
+    - name: Run actionlint
+      uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca  # v1.7.12
