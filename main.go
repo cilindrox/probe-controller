@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -20,6 +21,7 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+	version  = "dev"
 )
 
 // Register k8s types and Gateway API v1
@@ -33,16 +35,22 @@ func main() {
 	var metricsAddr string
 	var probeAddr string
 	var enableLeaderElection bool
+	var showVersion bool
 
 	flag.StringVar(&apiURL, "api-url", "", "External API URL.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager.")
+	flag.BoolVar(&showVersion, "version", false, "Print version and exit.")
 	flag.Parse()
 
-	apiToken := os.Getenv("EXTERNAL_API_TOKEN")
+	if showVersion {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	setupLog.Info("initializing the controller", "version", version)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -56,6 +64,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	apiToken := os.Getenv("EXTERNAL_API_TOKEN")
 	// Register the HTTPRouteWatcher reconciler
 	if err = (&controllers.HTTPRouteWatcher{
 		Client:         mgr.GetClient(),
