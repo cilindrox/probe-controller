@@ -8,9 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -93,12 +91,10 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	route := &gatewayv1.HTTPRoute{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-route",
-			Namespace: "default",
-			Annotations: map[string]string{
-				triggerAnnotation: "true",
-			},
+		Name:      "my-route",
+		Namespace: "default",
+		Annotations: map[string]string{
+			triggerAnnotation: "true",
 		},
 		Spec: gatewayv1.HTTPRouteSpec{
 			Hostnames: []gatewayv1.Hostname{"app.example.com"},
@@ -107,7 +103,8 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 
 	env := newTestEnv(t, route)
 	req := ctrl.Request{
-		NamespacedName: types.NamespacedName{Name: "my-route", Namespace: "default"},
+		Name:      "my-route",
+		Namespace: "default",
 	}
 
 	// --- TEST: CREATE ---
@@ -184,16 +181,15 @@ func TestHTTPRouteWatcher_AnnotationRemoved_CleansUpFinalizer(t *testing.T) {
 	ctx := context.Background()
 
 	route := &gatewayv1.HTTPRoute{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "untracked-route",
-			Namespace:  "default",
-			Finalizers: []string{finalizerName},
-		},
+		Name:       "untracked-route",
+		Namespace:  "default",
+		Finalizers: []string{finalizerName},
 	}
 
 	env := newTestEnv(t, route)
 	req := ctrl.Request{
-		NamespacedName: types.NamespacedName{Name: "untracked-route", Namespace: "default"},
+		Name:      "untracked-route",
+		Namespace: "default",
 	}
 
 	// --- TEST: Remove finalizer without calling external API ---
@@ -239,12 +235,10 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 		{
 			name: "API 500 on create returns error and does not stamp generation",
 			route: &gatewayv1.HTTPRoute{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "fail-create",
-					Namespace:   "default",
-					Finalizers:  []string{finalizerName},
-					Annotations: map[string]string{triggerAnnotation: "true"},
-				},
+				Name:        "fail-create",
+				Namespace:   "default",
+				Finalizers:  []string{finalizerName},
+				Annotations: map[string]string{triggerAnnotation: "true"},
 			},
 			apiStatusCode:     http.StatusInternalServerError,
 			wantErr:           true,
@@ -253,12 +247,10 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 		{
 			name: "API 500 on delete returns error and keeps finalizer",
 			route: &gatewayv1.HTTPRoute{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "fail-delete",
-					Namespace:   "default",
-					Finalizers:  []string{finalizerName},
-					Annotations: map[string]string{triggerAnnotation: "true"},
-				},
+				Name:        "fail-delete",
+				Namespace:   "default",
+				Finalizers:  []string{finalizerName},
+				Annotations: map[string]string{triggerAnnotation: "true"},
 			},
 			deleteBeforeSync:  true,
 			apiStatusCode:     http.StatusInternalServerError,
@@ -268,12 +260,10 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 		{
 			name: "invalid external URL returns request error",
 			route: &gatewayv1.HTTPRoute{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "bad-url",
-					Namespace:   "default",
-					Finalizers:  []string{finalizerName},
-					Annotations: map[string]string{triggerAnnotation: "true"},
-				},
+				Name:        "bad-url",
+				Namespace:   "default",
+				Finalizers:  []string{finalizerName},
+				Annotations: map[string]string{triggerAnnotation: "true"},
 			},
 			overrideURL:       "://invalid-url",
 			wantErr:           true,
@@ -282,12 +272,10 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 		{
 			name: "sends Bearer token when APIToken is configured",
 			route: &gatewayv1.HTTPRoute{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "auth-route",
-					Namespace:   "default",
-					Finalizers:  []string{finalizerName},
-					Annotations: map[string]string{triggerAnnotation: "true"},
-				},
+				Name:        "auth-route",
+				Namespace:   "default",
+				Finalizers:  []string{finalizerName},
+				Annotations: map[string]string{triggerAnnotation: "true"},
 			},
 			apiStatusCode:     http.StatusOK,
 			apiToken:          "super-secret-token",
@@ -303,7 +291,8 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 
 			var env *testEnv
 			req := ctrl.Request{
-				NamespacedName: types.NamespacedName{Name: "missing-route", Namespace: "default"},
+				Name:      "missing-route",
+				Namespace: "default",
 			}
 
 			if tc.route != nil {

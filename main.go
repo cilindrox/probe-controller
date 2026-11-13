@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/cilindrox/probe-controller/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -16,6 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"github.com/cilindrox/probe-controller/controllers"
 )
 
 var (
@@ -45,7 +46,7 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Println(version)
+		_, _ = fmt.Fprintln(os.Stdout, version)
 		os.Exit(0)
 	}
 
