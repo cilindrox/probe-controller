@@ -13,6 +13,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -171,5 +173,59 @@ func computeSpecHash(spec gatewayv1.HTTPRouteSpec) (string, error) {
 func (r *HTTPRouteWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1.HTTPRoute{}).
+		WithEventFilter(routeEventFilter()).
 		Complete(r)
+}
+
+func routeEventFilter() predicate.Predicate {
+	isTracked := func(obj client.Object) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.GetAnnotations()[triggerAnnotation] == "true" ||
+			controllerutil.ContainsFinalizer(obj, finalizerName)
+	}
+
+	return predicate.Funcs{
+
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isTracked(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// ignore routes without the annotation/finalizer
+			if !isTracked(e.ObjectOld) && !isTracked(e.ObjectNew) {
+				return false
+			}
+
+			// reconcile if deletion started
+			if e.ObjectNew.GetDeletionTimestamp() != nil && e.ObjectOld.GetDeletionTimestamp() == nil {
+				return true
+			}
+
+			// reconcile if spec changed (generation incremented on spec updates)
+			if e.ObjectNew.GetGeneration() != e.ObjectOld.GetGeneration() {
+				return true
+			}
+
+			oldTrigger := e.ObjectOld.GetAnnotations()[triggerAnnotation]
+			newTrigger := e.ObjectNew.GetAnnotations()[triggerAnnotation]
+			if oldTrigger != newTrigger {
+				return true
+			}
+
+			oldHasFin := controllerutil.ContainsFinalizer(e.ObjectOld, finalizerName)
+			newHasFin := controllerutil.ContainsFinalizer(e.ObjectNew, finalizerName)
+			return oldHasFin != newHasFin
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			// finalizer deletion is handled via UpdateEvent when
+			// DeletionTimestamp is set.
+			// This is a placeholder in case fallback cleanup is needed.
+			return false
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return isTracked(e.Object)
+		},
+	}
+
 }
