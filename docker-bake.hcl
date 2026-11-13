@@ -1,7 +1,7 @@
 target "docker-metadata-action" {}
 
 variable "APP" {
-  default = "prober"
+  default = "probe-controller"
 }
 
 variable "VERSION" {
@@ -9,11 +9,11 @@ variable "VERSION" {
 }
 
 variable "SOURCE" {
-  default = "https://github.com/cilindrox/probe-controller"
+  default = "https://github.com/cilindrox/${APP}"
 }
 
 variable "REGISTRY" {
-  default = "ghcr.io/cilindrox/probe-controller"
+  default = "ghcr.io/cilindrox"
 }
 
 group "default" {
