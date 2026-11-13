@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -120,7 +121,7 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	}
 
 	events := env.recordedEvents()
-	if len(events) != 1 || events[0].Event != "CREATED" {
+	if len(events) != 1 || events[0].Event != eventCreated {
 		t.Fatalf("expected 1 CREATED event, got: %+v", events)
 	}
 	if len(events[0].Hostnames) != 1 || events[0].Hostnames[0] != "app.example.com" {
@@ -156,7 +157,7 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	}
 
 	events = env.recordedEvents()
-	if len(events) != 2 || events[1].Event != "UPDATED" {
+	if len(events) != 2 || events[1].Event != eventUpdated {
 		t.Fatalf("expected UPDATED event, got: %+v", events)
 	}
 	if len(events[1].Hostnames) != 1 || events[1].Hostnames[0] != "www.example.com" {
@@ -174,7 +175,7 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	}
 
 	events = env.recordedEvents()
-	if len(events) != 3 || events[2].Event != "DELETED" {
+	if len(events) != 3 || events[2].Event != eventDeleted {
 		t.Fatalf("expected DELETED event, got: %+v", events)
 	}
 }
@@ -285,6 +286,44 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 			wantFinalizerKept: true,
 			wantAuthHeader:    "Bearer super-secret-token",
 		},
+		{
+			name: "API 404 on delete succeeds and removes finalizer",
+			route: &gatewayv1.HTTPRoute{
+				Name:        "already-gone-404",
+				Namespace:   "default",
+				Finalizers:  []string{finalizerName},
+				Annotations: map[string]string{triggerAnnotation: "true"},
+			},
+			deleteBeforeSync:  true,
+			apiStatusCode:     http.StatusNotFound,
+			wantErr:           false,
+			wantFinalizerKept: false,
+		},
+		{
+			name: "API 410 on delete succeeds and removes finalizer",
+			route: &gatewayv1.HTTPRoute{
+				Name:        "already-gone-410",
+				Namespace:   "default",
+				Finalizers:  []string{finalizerName},
+				Annotations: map[string]string{triggerAnnotation: "true"},
+			},
+			deleteBeforeSync:  true,
+			apiStatusCode:     http.StatusGone,
+			wantErr:           false,
+			wantFinalizerKept: false,
+		},
+		{
+			name: "API 404 on create still fails",
+			route: &gatewayv1.HTTPRoute{
+				Name:        "missing-endpoint-create",
+				Namespace:   "default",
+				Finalizers:  []string{finalizerName},
+				Annotations: map[string]string{triggerAnnotation: "true"},
+			},
+			apiStatusCode:     http.StatusNotFound,
+			wantErr:           true,
+			wantFinalizerKept: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -328,15 +367,20 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 
 			if tc.route != nil {
 				var current gatewayv1.HTTPRoute
-				if err := env.client.Get(ctx, req.NamespacedName, &current); err != nil {
+				err := env.client.Get(ctx, req.NamespacedName, &current)
+				if !tc.wantFinalizerKept {
+					if !apierrors.IsNotFound(err) && controllerutil.ContainsFinalizer(&current, finalizerName) {
+						t.Fatalf("expected route to be deleted or finalizer removed, err=%v, finalizers=%v", err, current.Finalizers)
+					}
+					return
+				}
+
+				if err != nil {
 					t.Fatalf("failed to get route after reconcile: %v", err)
 				}
-
-				hasFinalizer := controllerutil.ContainsFinalizer(&current, finalizerName)
-				if hasFinalizer != tc.wantFinalizerKept {
-					t.Fatalf("finalizer present = %v, want %v", hasFinalizer, tc.wantFinalizerKept)
+				if !controllerutil.ContainsFinalizer(&current, finalizerName) {
+					t.Fatalf("expected finalizer %q to remain, got: %v", finalizerName, current.Finalizers)
 				}
-
 				if tc.wantErr && current.Annotations[checksumAnnotation] != "" {
 					t.Fatalf("expected checksumAnnotation not to be stamped on failed API call, got %q", current.Annotations[checksumAnnotation])
 				}

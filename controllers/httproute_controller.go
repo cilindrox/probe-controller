@@ -22,6 +22,10 @@ const (
 	triggerAnnotation  = "probe-controller.local/register"
 	checksumAnnotation = "probe-controller.local/checksum"
 	finalizerName      = "probe-controller.local/finalizer"
+
+	eventCreated = "CREATED"
+	eventUpdated = "UPDATED"
+	eventDeleted = "DELETED"
 )
 
 type HTTPRouteWatcher struct {
@@ -97,9 +101,9 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	eventType := "UPDATED"
+	eventType := eventUpdated
 	if lastSyncedHash == "" {
-		eventType = "CREATED"
+		eventType = eventCreated
 	}
 
 	payload := WebhookPayload{
@@ -153,6 +157,10 @@ func (r *HTTPRouteWatcher) callExternalAPI(ctx context.Context, payload WebhookP
 	defer func() {
 		_ = resp.Body.Close()
 	}()
+
+	if payload.Event == eventDeleted && (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone) {
+		return nil
+	}
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("external api failed with http %d", resp.StatusCode)
