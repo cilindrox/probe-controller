@@ -94,9 +94,8 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 
 	route := &gatewayv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       "my-route",
-			Namespace:  "default",
-			Generation: 1,
+			Name:      "my-route",
+			Namespace: "default",
 			Annotations: map[string]string{
 				triggerAnnotation: "true",
 			},
@@ -141,7 +140,6 @@ func TestHTTPRouteWatcher_Lifecycle(t *testing.T) {
 	// --- TEST: UPDATE ---
 	var updatedRoute gatewayv1.HTTPRoute
 	_ = env.client.Get(ctx, req.NamespacedName, &updatedRoute)
-	updatedRoute.Generation = 2 // API server increments generation
 	updatedRoute.Spec.Hostnames = []gatewayv1.Hostname{"www.example.com"}
 	_ = env.client.Update(ctx, &updatedRoute)
 
@@ -181,9 +179,6 @@ func TestHTTPRouteWatcher_AnnotationRemoved_CleansUpFinalizer(t *testing.T) {
 			Name:       "untracked-route",
 			Namespace:  "default",
 			Finalizers: []string{finalizerName},
-			Annotations: map[string]string{
-				lastSyncedAnnotation: "1",
-			},
 		},
 	}
 
@@ -238,7 +233,6 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "fail-create",
 					Namespace:   "default",
-					Generation:  1,
 					Finalizers:  []string{finalizerName},
 					Annotations: map[string]string{triggerAnnotation: "true"},
 				},
@@ -268,7 +262,6 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "bad-url",
 					Namespace:   "default",
-					Generation:  1,
 					Finalizers:  []string{finalizerName},
 					Annotations: map[string]string{triggerAnnotation: "true"},
 				},
@@ -283,7 +276,6 @@ func TestHTTPRouteWatcher_ErrorsAndAuth(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "auth-route",
 					Namespace:   "default",
-					Generation:  1,
 					Finalizers:  []string{finalizerName},
 					Annotations: map[string]string{triggerAnnotation: "true"},
 				},

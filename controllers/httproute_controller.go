@@ -3,10 +3,11 @@ package controllers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -63,9 +64,8 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	// Check if trigger annotation is enabled
+	// If annotation was removed, clean up the finalizer
 	if route.Annotations[triggerAnnotation] != "true" {
-		// If annotation was removed, clean up the finalizer
 		if controllerutil.ContainsFinalizer(&route, finalizerName) {
 			controllerutil.RemoveFinalizer(&route, finalizerName)
 			return ctrl.Result{}, r.Update(ctx, &route)
@@ -83,15 +83,18 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Prevent dupe API calls on status-only updates
-	// TODO: hash spec fields to account for domain changes
-	currentGen := strconv.FormatInt(route.Generation, 10)
-	lastSyncedGen := route.Annotations[lastSyncedAnnotation]
-	if currentGen == lastSyncedGen {
+	currentHash, err := computeSpecHash(route.Spec)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	lastSyncedHash := route.Annotations[lastSyncedAnnotation]
+	if currentHash == lastSyncedHash {
 		return ctrl.Result{}, nil
 	}
 
 	eventType := "UPDATED"
-	if lastSyncedGen == "" {
+	if lastSyncedHash == "" {
 		eventType = "CREATED"
 	}
 
@@ -110,7 +113,7 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if route.Annotations == nil {
 		route.Annotations = make(map[string]string)
 	}
-	route.Annotations[lastSyncedAnnotation] = currentGen
+	route.Annotations[lastSyncedAnnotation] = currentHash
 	if err := r.Update(ctx, &route); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -151,6 +154,16 @@ func (r *HTTPRouteWatcher) callExternalAPI(ctx context.Context, payload WebhookP
 		return fmt.Errorf("external api failed with http %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// encode payload and return a 16-char hex digest
+func computeSpecHash(spec gatewayv1.HTTPRouteSpec) (string, error) {
+	data, err := json.Marshal(spec)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal HTTPRoute spec: %w", err)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:8]), nil
 }
 
 func (r *HTTPRouteWatcher) SetupWithManager(mgr ctrl.Manager) error {
