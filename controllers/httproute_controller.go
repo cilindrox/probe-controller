@@ -75,7 +75,16 @@ func (r *HTTPRouteWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// If annotation was removed, clean up the finalizer
 	if route.Annotations[triggerAnnotation] != "true" {
 		if controllerutil.ContainsFinalizer(&route, finalizerName) {
+			payload := WebhookPayload{
+				Event:     eventDeleted,
+				Name:      route.Name,
+				Namespace: route.Namespace,
+			}
+			if err := r.callExternalAPI(ctx, payload); err != nil {
+				return ctrl.Result{}, err
+			}
 			controllerutil.RemoveFinalizer(&route, finalizerName)
+			delete(route.Annotations, checksumAnnotation)
 			return ctrl.Result{}, r.Patch(ctx, &route, client.MergeFrom(base))
 		}
 		return ctrl.Result{}, nil
