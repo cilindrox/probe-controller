@@ -68,7 +68,7 @@ func main() {
 		Metrics:                metricsserver.Options{BindAddress: metricsAddr},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "example.com",
+		LeaderElectionID:       "probe-controller-leader",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
